@@ -1,0 +1,526 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Camplify AER Sales Tool</title>
+    
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,100..900;1,100..900&display=swap" rel="stylesheet">
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <style>
+        body {
+            font-family: 'Montserrat', sans-serif;
+        }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        .fade-in { animation: fadeIn 0.4s ease-out forwards; }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .objection-card.active {
+            border-color: #2563eb;
+            background-color: #eff6ff;
+            transform: translateX(4px);
+        }
+        .text-pretty { text-wrap: pretty; }
+        
+        /* New Risk Card styles */
+        .risk-glow {
+            box-shadow: 0 0 40px -10px rgba(239, 68, 68, 0.1);
+        }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-900 overflow-hidden h-screen flex">
+
+    <!-- Configuration Modal -->
+    <div id="config-modal" class="fixed inset-0 bg-slate-900/90 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-white rounded-3xl shadow-2xl w-full max-w-2xl overflow-hidden border border-slate-200 animate-[fadeIn_0.3s_ease-out]">
+            <div class="bg-slate-900 text-white p-6 flex justify-between items-center">
+                <div>
+                    <h2 class="text-xl font-black tracking-tighter uppercase">Deal Config</h2>
+                    <p class="text-slate-400 text-xs font-bold uppercase tracking-widest">Adjust trip variables</p>
+                </div>
+                <button onclick="toggleConfig(false)" class="bg-slate-800 hover:bg-slate-700 p-2 rounded-full">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+            
+            <div class="p-8">
+                <div class="mb-8">
+                    <label class="text-xs font-black text-slate-400 uppercase tracking-widest mb-4 block underline decoration-blue-600 decoration-2 underline-offset-4">1. Vehicle Category</label>
+                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3" id="vehicle-type-grid"></div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <div class="space-y-5">
+                        <label class="text-xs font-black text-slate-400 uppercase tracking-widest block underline decoration-blue-600 decoration-2 underline-offset-4">2. Trip Basics</label>
+                        <div class="grid grid-cols-1 gap-4">
+                            <div class="space-y-1">
+                                <p class="text-[10px] font-bold text-slate-500 uppercase tracking-tight">Agent Name</p>
+                                <input type="text" id="input-agent-name" class="w-full bg-slate-50 border-slate-200 rounded-xl p-3 text-sm font-bold focus:ring-2 focus:ring-blue-600 outline-none border text-slate-900" oninput="updateState('agentName', this.value)">
+                            </div>
+                            <div class="grid grid-cols-2 gap-3">
+                                <div class="space-y-1">
+                                    <p class="text-[10px] font-bold text-slate-500 uppercase tracking-tight">Duration (Days)</p>
+                                    <input type="number" id="input-duration" class="w-full bg-slate-50 border-slate-200 rounded-xl p-3 text-sm font-bold focus:ring-2 focus:ring-blue-600 outline-none border text-slate-900" oninput="updateState('bookingDuration', this.value)">
+                                </div>
+                                <div class="space-y-1">
+                                    <p class="text-[10px] font-bold text-slate-500 uppercase tracking-tight">Days Until Trip</p>
+                                    <input type="number" id="input-days-until" class="w-full bg-slate-50 border-slate-200 rounded-xl p-3 text-sm font-bold focus:ring-2 focus:ring-blue-600 outline-none border text-slate-900" oninput="updateState('daysUntilStart', this.value)">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-blue-50 p-6 rounded-3xl border border-blue-100 flex flex-col justify-center text-center">
+                        <p class="text-[10px] font-black text-blue-500 uppercase tracking-widest mb-2">Liability Gap Preview</p>
+                        <div id="modal-liability-gap" class="font-black text-4xl text-slate-900 tracking-tighter mb-1">$0</div>
+                        <p class="text-[10px] font-bold text-slate-500 uppercase">Risk Reduction</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="p-6 bg-slate-50 border-t border-slate-200 flex justify-end">
+                <button onclick="toggleConfig(false)" class="bg-slate-900 hover:bg-blue-700 text-white px-12 py-4 rounded-2xl font-black text-sm tracking-widest shadow-lg transition-all active:scale-95">SYNC PLAYBOOK</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Sidebar -->
+    <aside class="w-80 bg-slate-900 text-white flex flex-col z-30 shadow-2xl shrink-0">
+        <div class="p-8 pb-4">
+            <div class="flex items-center gap-2 mb-8">
+                <div class="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center font-black text-lg">C</div>
+                <h1 class="font-black text-sm tracking-[0.2em] uppercase">Camplify AER</h1>
+            </div>
+
+            <button onclick="toggleConfig(true)" class="w-full bg-slate-800 hover:bg-slate-700 border border-slate-700 p-4 rounded-2xl flex items-center justify-between transition-all group cursor-pointer">
+                <div class="text-left">
+                    <p class="text-[10px] font-black text-blue-400 uppercase tracking-widest mb-1">Vehicle Type</p>
+                    <p id="sidebar-vehicle-label" class="text-xs font-bold text-slate-100 truncate w-32">Campervan</p>
+                </div>
+                <i data-lucide="settings" class="w-4 h-4 text-slate-500 group-hover:text-white transition-colors"></i>
+            </button>
+        </div>
+
+        <div class="flex-1 overflow-y-auto px-6 py-4 space-y-4 no-scrollbar">
+            <div class="bg-slate-800 border border-slate-700 p-5 rounded-2xl text-white">
+                <div class="flex items-center gap-2 mb-2">
+                    <i data-lucide="shield-x" class="w-3 h-3 text-red-400"></i>
+                    <span class="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Risk Taker Excess</span>
+                </div>
+                <div id="stat-rt-excess" class="text-3xl font-black text-red-400 tracking-tighter">$4000</div>
+            </div>
+
+            <div class="bg-slate-800 border border-slate-700 p-5 rounded-2xl text-white">
+                <div class="flex items-center gap-2 mb-2">
+                    <i data-lucide="shield-check" class="w-3 h-3 text-green-400"></i>
+                    <span class="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Happy Camper Excess</span>
+                </div>
+                <div id="stat-hc-excess" class="text-3xl font-black text-green-400 tracking-tighter">$500</div>
+            </div>
+
+            <div class="bg-slate-800 border border-slate-700 p-5 rounded-2xl text-white">
+                <div class="flex items-center gap-2 mb-2">
+                    <i data-lucide="zap" class="w-3 h-3 text-blue-400"></i>
+                    <span class="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Upgrade Total</span>
+                </div>
+                <div id="stat-upgrade-total" class="text-3xl font-black text-blue-400 tracking-tighter">$140</div>
+                <div id="stat-upgrade-daily" class="text-[11px] text-slate-300 font-bold mt-1 uppercase tracking-tight">$20 / Day</div>
+            </div>
+            
+            <div class="bg-slate-800 border border-slate-700 p-4 rounded-2xl text-white">
+                <a href="https://terms.camplify.com.au/aer-inclusions-and-exclusions" target="_blank" class="flex items-center justify-between group hover:text-blue-300 transition-colors text-[10px] font-black uppercase tracking-[0.1em]">
+                    Open AER Matrix <i data-lucide="external-link" class="w-3 h-3"></i>
+                </a>
+            </div>
+        </div>
+
+        <div class="p-6 bg-black/20">
+            <p class="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-3 text-center">Global Tone Switcher</p>
+            <div class="flex bg-slate-900 rounded-xl p-1 border border-slate-800">
+                <button onclick="setTone('soft')" id="btn-tone-soft" class="flex-1 py-3 text-[10px] font-black rounded-lg transition-all">CONSULTATIVE</button>
+                <button onclick="setTone('hard')" id="btn-tone-hard" class="flex-1 py-3 text-[10px] font-black rounded-lg transition-all">RISK-FOCUSED</button>
+            </div>
+        </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="flex-1 flex flex-col relative bg-white overflow-hidden w-full">
+        <nav class="h-16 border-b border-slate-100 flex items-center px-10 gap-6 bg-white sticky top-0 z-20 overflow-x-auto no-scrollbar" id="main-nav"></nav>
+
+        <div class="flex-1 overflow-y-auto px-8 md:px-12 py-8 pb-32 w-full no-scrollbar" id="scroll-container">
+            <div class="max-w-5xl mx-auto w-full" id="content-area"></div>
+        </div>
+    </main>
+
+    <script>
+        const VEHICLE_TYPES = [
+            { id: 'campervan', label: 'Drive: Campervan', rtExcess: 4000, rtCost: 19, hcExcess: 500, hcCost: 39, icon: 'truck' },
+            { id: 'motorhome', label: 'Drive: Motorhome', rtExcess: 4500, rtCost: 29, hcExcess: 500, hcCost: 49, icon: 'truck' },
+            { id: 'offroad_drive', label: 'Drive: Off Road', rtExcess: 5500, rtCost: 29, hcExcess: 500, hcCost: 49, icon: 'map-pin' },
+            { id: 'tow_onroad', label: 'Tow: On Road', rtExcess: 4000, rtCost: 19, hcExcess: 500, hcCost: 39, icon: 'car' },
+            { id: 'tow_offroad', label: 'Tow: Off Road', rtExcess: 4500, rtCost: 29, hcExcess: 500, hcCost: 49, icon: 'map-pin' },
+            { id: 'drive_to_tow', label: 'Drive to Tow', rtExcess: 4000, rtCost: 25, hcExcess: 500, hcCost: 45, icon: 'car' },
+            { id: 'deliver', label: 'Deliver', rtExcess: 1000, rtCost: 9, hcExcess: 250, hcCost: 15, icon: 'map-pin' },
+            { id: 'stay', label: 'Stay', rtExcess: 1000, rtCost: 9, hcExcess: 250, hcCost: 15, icon: 'home' },
+        ];
+
+        const OBJECTIONS = [
+            {
+                id: 'careful',
+                label: "Careful Driver",
+                icon: 'check-circle',
+                points: ["Weather/Stones/Wildlife", "Protection from unpredictability", "Peace of mind price"],
+                script: () => "Absolutely – and most of our careful drivers still upgrade. The biggest claims aren’t from bad driving. They’re from things you can’t control, like weather, stones, wildlife, or parked damage. Happy Camper is protection from unpredictability, not a reflection on your driving. Plus, we’ve tried to put a price on peace of mind."
+            },
+            {
+                id: 'money',
+                label: "Cost Concern",
+                icon: 'dollar-sign',
+                points: ["Breakdown per day", "Excess difference vs upgrade cost", "Small spend now vs high cost later"],
+                script: (data) => {
+                    const upgradeDaily = data.hcDaily - data.rtDaily;
+                    const tripTotal = upgradeDaily * data.bookingDuration;
+                    const saving = data.rtExcess - data.hcExcess;
+                    return `I get that completely. Over your whole booking, the upgrade works out to about $${tripTotal.toFixed(0)} total. The difference in excess alone is roughly $${saving}, so you’re spending a small amount now to avoid a potentially high cost later.`;
+                }
+            },
+            {
+                id: 'history',
+                label: "No Issues History",
+                icon: 'shield-alert',
+                points: ["Larger/Heavier vehicles", "Wind/Debris exposure", "First-time claims"],
+                script: () => "That’s totally fair. The thing with caravans and campers is they’re larger, heavier, and more exposed to wind and road debris than cars. Most first claims come from people who’ve never had an issue before because these vehicles handle so differently."
+            },
+            {
+                id: 'delivery_stay',
+                label: "Stay/Delivery",
+                icon: 'home',
+                points: [" possession responsibility", "Storms/Falling branches", "$1,000 to $250 drop"],
+                script: (data) => `That’s actually when people are most caught out. Even if you’re not driving, you’re still responsible while the vehicle is in your possession. Storms, falling branches, or someone hitting the vehicle while it’s parked can still happen. On delivery and stay bookings, Happy Camper reduces the excess from $${data.rtExcess} to $${data.hcExcess} for a small daily increase, which is why most customers upgrade in these cases.`
+            },
+            {
+                id: 'risk_it',
+                label: "I'll Risk It",
+                icon: 'dice-5',
+                points: ["Informed choice", "Excluded items remain responsibility", "High per-incident excess"],
+                script: () => "That’s completely your choice. I just want to make sure it’s an informed one. Without Happy Camper, excluded items like tyres, windscreens, and awnings remain fully your responsibility, and the excess per incident stays high."
+            },
+            {
+                id: 'later',
+                label: "Decide Later",
+                icon: 'clock',
+                points: ["Must be before start", "No backdating once trip starts", "Reach out ahead of time"],
+                script: () => "You can change or upgrade your AER any time before the booking starts. Once the booking has commenced, we can’t add or backdate cover, which is why we reach out ahead of time."
+            }
+        ];
+
+        const NAV_ITEMS = [
+            { id: 'pre_call', label: '0. PRE-CALL', icon: 'clipboard-list' },
+            { id: 'intro', label: '1. INTRO', icon: 'phone' },
+            { id: 'exposure', label: '2. RISK', icon: 'alert-triangle' },
+            { id: 'solution', label: '3. SOLUTION', icon: 'zap' },
+            { id: 'scenarios', label: '4. STORY', icon: 'book-open' },
+            { id: 'objections', label: '5. OBJECTIONS', icon: 'shield-alert' },
+            { id: 'close', label: '6. CLOSE', icon: 'shield-check' }
+        ];
+
+        let state = {
+            activeSection: 'pre_call',
+            tone: 'soft',
+            selectedObjection: 'careful',
+            closeType: 'standard',
+            pricing: {
+                vehicleTypeId: 'campervan',
+                rtDaily: 19,
+                rtExcess: 4000,
+                hcDaily: 39,
+                hcExcess: 500,
+                bookingDuration: 7,
+                daysUntilStart: 3,
+                agentName: 'Agent'
+            }
+        };
+
+        function setVehicleType(id) {
+            const v = VEHICLE_TYPES.find(x => x.id === id);
+            state.pricing = { ...state.pricing, vehicleTypeId: v.id, rtExcess: v.rtExcess, rtDaily: v.rtCost, hcDaily: v.hcCost, hcExcess: v.hcExcess };
+            renderAll();
+        }
+
+        function updateState(k, v) { state.pricing[k] = (k==='agentName'?v:parseInt(v)||0); renderAll(); }
+        function setTone(t) { state.tone = t; renderAll(); }
+        function setCloseType(t) { state.closeType = t; renderContent(); }
+        function setActiveSection(s) { state.activeSection = s; renderAll(); }
+        function toggleConfig(s) { document.getElementById('config-modal').classList.toggle('hidden', !s); if(s) { document.getElementById('input-agent-name').value = state.pricing.agentName; document.getElementById('input-duration').value = state.pricing.bookingDuration; document.getElementById('input-days-until').value = state.pricing.daysUntilStart; } }
+        function selectObjection(id) { state.selectedObjection = id; renderContent(); }
+
+        function renderSidebar() {
+            const v = VEHICLE_TYPES.find(x => x.id === state.pricing.vehicleTypeId);
+            const ud = state.pricing.hcDaily - state.pricing.rtDaily;
+            document.getElementById('sidebar-vehicle-label').textContent = v.label;
+            document.getElementById('stat-rt-excess').textContent = `$${state.pricing.rtExcess}`;
+            document.getElementById('stat-hc-excess').textContent = `$${state.pricing.hcExcess}`;
+            document.getElementById('stat-upgrade-total').textContent = `$${(ud * state.pricing.bookingDuration).toFixed(0)}`;
+            document.getElementById('stat-upgrade-daily').textContent = `$${ud.toFixed(0)} / Day`;
+
+            const btnS = document.getElementById('btn-tone-soft');
+            const btnH = document.getElementById('btn-tone-hard');
+            btnS.className = `flex-1 py-3 text-[10px] font-black rounded-lg transition-all ${state.tone==='soft'?'bg-blue-600 text-white shadow-lg':'text-slate-500 hover:text-white'}`;
+            btnH.className = `flex-1 py-3 text-[10px] font-black rounded-lg transition-all ${state.tone==='hard'?'bg-red-600 text-white shadow-lg':'text-slate-500 hover:text-white'}`;
+        }
+
+        function renderConfigModal() {
+            document.getElementById('vehicle-type-grid').innerHTML = VEHICLE_TYPES.map(t => {
+                const active = state.pricing.vehicleTypeId === t.id;
+                return `<button onclick="setVehicleType('${t.id}')" class="p-4 rounded-2xl border-2 text-[10px] font-black flex flex-col items-center gap-2 transition-all ${active ? 'border-blue-600 bg-blue-50 text-blue-800' : 'border-slate-100 text-slate-500 hover:border-slate-200'}"><i data-lucide="${t.icon}" class="w-4 h-4"></i>${t.label.toUpperCase()}</button>`;
+            }).join('');
+            document.getElementById('modal-liability-gap').textContent = `$${state.pricing.rtExcess - state.pricing.hcExcess}`;
+        }
+
+        function renderNav() {
+            document.getElementById('main-nav').innerHTML = NAV_ITEMS.map(i => {
+                const active = state.activeSection === i.id;
+                return `<button onclick="setActiveSection('${i.id}')" class="whitespace-nowrap flex items-center gap-2 h-full border-b-2 text-[10px] font-black tracking-widest transition-all ${active ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-400 hover:text-slate-600'}"><i data-lucide="${i.icon}" class="w-4 h-4"></i> ${i.label}</button>`;
+            }).join('');
+        }
+
+        function renderContent() {
+            const container = document.getElementById('content-area');
+            const { pricing, tone } = state;
+            const ud = pricing.hcDaily - pricing.rtDaily;
+            let html = '';
+
+            if (state.activeSection === 'pre_call') {
+                html = `
+                    <div class="fade-in max-w-2xl mx-auto">
+                        <div class="flex items-center gap-3 mb-8"><i data-lucide="clipboard-list" class="w-6 h-6 text-slate-600"></i><h2 class="text-4xl font-black tracking-tighter uppercase">Pre-Call Check</h2></div>
+                        <div class="bg-white rounded-[40px] border-2 border-slate-100 p-10 shadow-sm mb-8 space-y-4">
+                            <div class="flex justify-between p-4 bg-slate-50 rounded-2xl"><span class="font-bold text-slate-600">RT Daily / Excess</span><span class="font-black">$${pricing.rtDaily} / $${pricing.rtExcess}</span></div>
+                            <div class="flex justify-between p-4 bg-blue-50 rounded-2xl border border-blue-100"><span class="font-bold text-blue-800">HC Upgrade / Total</span><span class="font-black text-blue-600">+$${ud.toFixed(0)} / $${pricing.hcDaily}</span></div>
+                            <div class="flex justify-between p-4 bg-green-50 rounded-2xl border border-green-100"><span class="font-bold text-green-800">HC Excess</span><span class="font-black text-green-600">$${pricing.hcExcess}</span></div>
+                        </div>
+                        <div class="bg-amber-50 rounded-3xl p-6 border border-amber-100 mb-8"><h4 class="text-[10px] font-black text-amber-600 uppercase mb-4 tracking-widest">Reminders</h4><ul class="space-y-2 text-xs font-bold text-amber-900 opacity-80"><li>• Excess applies PER incident</li><li>• Changeable until booking COMMENCES</li></ul></div>
+                        <button onclick="setActiveSection('intro')" class="w-full bg-slate-900 text-white p-5 rounded-2xl font-black text-sm tracking-widest flex items-center justify-center gap-3 shadow-xl uppercase">Start Conversation <i data-lucide="phone"></i></button>
+                    </div>`;
+            } else if (state.activeSection === 'intro') {
+                const script = tone === 'soft' 
+                    ? `“Hey, this is <span class="text-blue-600">${pricing.agentName}</span> from Camplify. I’m just touching base about your upcoming booking in <span class="underline decoration-4 decoration-blue-200">${pricing.daysUntilStart} days</span>. I wanted to quickly run through your Accident Excess Reduction cover, just to make sure you’re comfortable with your current level of protection before the trip begins.”`
+                    : `“Hey, this is <span class="text-red-600">${pricing.agentName}</span> from Camplify. I’m calling ahead of your booking in <span class="underline decoration-4 decoration-red-200">${pricing.daysUntilStart} days</span> because we need to make sure you’re fully aware of what you’re covered for under your current AER, and whether you’d like to reduce your financial exposure before the hire starts.”`;
+                html = `<div class="fade-in"><div class="inline-block px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest mb-6 ${tone==='soft'?'bg-blue-100 text-blue-600':'bg-red-100 text-red-600'}">${tone==='soft'?'Consultative':'Risk-Focused'}</div><div class="bg-white border-2 border-slate-100 rounded-[40px] p-12 mb-8"><p class="text-3xl font-bold text-slate-800 leading-snug italic text-pretty">${script}</p></div><div class="flex justify-end"><button onclick="setActiveSection('exposure')" class="bg-slate-900 text-white px-10 py-5 rounded-2xl font-black text-sm tracking-widest flex items-center gap-3 shadow-xl uppercase">NEXT: ESTABLISH RISK <i data-lucide="arrow-right"></i></button></div></div>`;
+            } else if (state.activeSection === 'exposure') {
+                html = `
+                    <div class="fade-in max-w-6xl mx-auto">
+                        <div class="flex items-end justify-between mb-8 border-b-2 border-slate-100 pb-4">
+                            <h2 class="text-4xl font-black tracking-tighter uppercase text-slate-900">2. Establish Risk</h2>
+                            <span class="text-[11px] font-bold text-slate-400 uppercase tracking-widest bg-slate-100 px-3 py-1 rounded-lg">Make 'Risk Taker' feel incomplete</span>
+                        </div>
+                        
+                        <!-- Core Pitch Script -->
+                        <div class="bg-slate-900 rounded-[32px] p-10 md:p-12 mb-10 risk-glow relative overflow-hidden">
+                             <!-- Visual accent -->
+                            <div class="absolute top-0 right-0 p-8 opacity-10">
+                                <i data-lucide="shield-alert" class="w-40 h-40 text-red-500"></i>
+                            </div>
+
+                            <div class="relative z-10">
+                                <p class="text-3xl md:text-4xl font-semibold text-white leading-[1.3] text-pretty">
+                                    “You’re currently on our <span class="text-red-400 font-black">basic Risk Taker AER</span>. That option has a <span class="underline decoration-red-500/50 underline-offset-8">higher excess of $${pricing.rtExcess}</span> per incident...”
+                                </p>
+                                <p class="text-2xl md:text-3xl font-medium text-slate-400 mt-6 italic">
+                                    “...and excludes some of the <span class="text-white underline decoration-blue-500 underline-offset-4">most common damage items</span> we see, like <span class="text-white font-bold">tyres, windscreens, awnings, and annexes</span>.”
+                                </p>
+                            </div>
+                        </div>
+
+                        <!-- Glancable Flashcards -->
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-12">
+                            <!-- Card 1: Relatable Context -->
+                            <div class="bg-white border-2 border-slate-100 rounded-3xl p-8 hover:border-blue-200 transition-all group">
+                                <div class="flex items-center gap-3 mb-4">
+                                    <div class="p-2 bg-blue-50 text-blue-600 rounded-xl group-hover:bg-blue-600 group-hover:text-white transition-all">
+                                        <i data-lucide="wind" class="w-5 h-5"></i>
+                                    </div>
+                                    <h4 class="text-xs font-black text-slate-400 uppercase tracking-widest">Relatable Context</h4>
+                                </div>
+                                <p class="text-xl font-bold text-slate-800 leading-snug">
+                                    “These aren’t usually high-speed accidents. They’re <span class="text-blue-600 italic">sudden wind gusts</span> damaging awnings, <span class="text-blue-600 italic">stone chips</span>, tight parks, or <span class="text-blue-600 italic">tyre failures</span>.”
+                                </p>
+                            </div>
+
+                            <!-- Card 2: The Consequence -->
+                            <div class="bg-red-50/30 border-2 border-red-100/50 rounded-3xl p-8 hover:border-red-200 transition-all group">
+                                <div class="flex items-center gap-3 mb-4">
+                                    <div class="p-2 bg-red-100 text-red-600 rounded-xl group-hover:bg-red-600 group-hover:text-white transition-all">
+                                        <i data-lucide="wallet" class="w-5 h-5"></i>
+                                    </div>
+                                    <h4 class="text-xs font-black text-red-400 uppercase tracking-widest">The Financial Impact</h4>
+                                </div>
+                                <p class="text-xl font-bold text-red-900 leading-snug">
+                                    “Under Risk Taker, those repairs can come <span class="underline decoration-red-300">directly out of pocket</span>, up to <span class="font-black">$${pricing.rtExcess} each time</span>.”
+                                </p>
+                            </div>
+                        </div>
+
+                        <!-- Framing Toggles -->
+                        <div class="space-y-4 mb-12">
+                            <h4 class="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] mb-4 text-center">Choose your Framing</h4>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <!-- Soft Frame -->
+                                <div class="flex items-center gap-6 bg-slate-50 border border-slate-200 p-6 rounded-2xl group hover:bg-white hover:shadow-xl hover:border-blue-200 transition-all cursor-default">
+                                    <div class="shrink-0 flex flex-col items-center">
+                                        <span class="text-[9px] font-black text-blue-500 uppercase vertical-text tracking-widest mb-2">Soft</span>
+                                        <div class="w-1 h-12 bg-blue-200 rounded-full group-hover:bg-blue-500 transition-all"></div>
+                                    </div>
+                                    <p class="text-lg font-bold text-slate-600 italic leading-snug">
+                                        “I just want to make sure there are <span class="text-slate-900">no surprises</span> that take away from your holiday.”
+                                    </p>
+                                </div>
+
+                                <!-- Strong Frame -->
+                                <div class="flex items-center gap-6 bg-slate-50 border border-slate-200 p-6 rounded-2xl group hover:bg-white hover:shadow-xl hover:border-red-200 transition-all cursor-default">
+                                    <div class="shrink-0 flex flex-col items-center">
+                                        <span class="text-[9px] font-black text-red-500 uppercase vertical-text tracking-widest mb-2">Strong</span>
+                                        <div class="w-1 h-12 bg-red-200 rounded-full group-hover:bg-red-500 transition-all"></div>
+                                    </div>
+                                    <p class="text-lg font-bold text-slate-600 italic leading-snug">
+                                        “At the moment, you’re <span class="text-red-600">exposed</span> to the highest-cost and most common repair scenarios our hirers experience.”
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="flex justify-center pt-8 border-t border-slate-100">
+                            <button onclick="setActiveSection('solution')" class="bg-blue-600 hover:bg-blue-700 text-white px-16 py-6 rounded-full font-black text-sm tracking-widest flex items-center gap-4 shadow-2xl hover:scale-105 transition-all uppercase">
+                                MOVE TO SOLUTION <i data-lucide="chevron-right" class="w-5 h-5"></i>
+                            </button>
+                        </div>
+                    </div>`;
+            } else if (state.activeSection === 'solution') {
+                html = `
+                    <div class="fade-in">
+                        <h2 class="text-4xl font-black tracking-tighter uppercase mb-10">Happy Camper Solution</h2>
+                        <div class="bg-green-700 text-white rounded-[40px] p-12 shadow-2xl mb-8">
+                            <p class="text-3xl font-bold mb-10 italic">“For an extra <span class="text-green-300 font-black">$${ud.toFixed(0)}</span>/day, it changes two things:”</p>
+                            <div class="grid grid-cols-2 gap-6">
+                                <div class="bg-black/20 p-8 rounded-3xl">
+                                    <h4 class="text-[10px] font-black uppercase text-green-300 mb-2">1. Excess Drop</h4>
+                                    <p class="text-xl font-bold">From $${pricing.rtExcess} to $${pricing.hcExcess} max per incident.</p>
+                                </div>
+                                <div class="bg-black/20 p-8 rounded-3xl">
+                                    <h4 class="text-[10px] font-black uppercase text-green-300 mb-2">2. Exclusions Removed</h4>
+                                    <p class="text-xl font-bold">Coverage for tyres, windscreens, and awnings.</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="flex justify-end"><button onclick="setActiveSection('scenarios')" class="bg-slate-900 text-white px-10 py-5 rounded-2xl font-black text-sm tracking-widest flex items-center gap-3 uppercase">Financial Story <i data-lucide="arrow-right"></i></button></div>
+                    </div>`;
+            } else if (state.activeSection === 'scenarios') {
+                html = `
+                    <div class="fade-in">
+                        <h2 class="text-4xl font-black tracking-tighter uppercase mb-10">Financial Story</h2>
+                        <div class="bg-white border-2 border-slate-100 rounded-[40px] p-12">
+                            <p class="text-2xl font-bold text-slate-700 italic mb-10">“Imagine during your trip: A stone chip, a wind gust damaging the awning, and a tyre failure...”</p>
+                            <div class="grid grid-cols-2 gap-12">
+                                <div>
+                                    <h4 class="text-[10px] font-black text-red-500 uppercase tracking-widest mb-6">Risk Taker</h4>
+                                    <ul class="space-y-4 text-sm font-bold text-slate-500">
+                                        <li class="flex justify-between border-b border-slate-50 pb-2"><span>Windscreen</span> <span class="text-slate-900">Up to $${pricing.rtExcess}</span></li>
+                                        <li class="flex justify-between border-b border-slate-50 pb-2"><span>Awning</span> <span class="text-slate-900">Up to $${pricing.rtExcess}</span></li>
+                                        <li class="flex justify-between"><span>Tyre</span> <span class="text-slate-900">Full Replacement</span></li>
+                                    </ul>
+                                </div>
+                                <div class="bg-green-50 p-8 rounded-3xl border border-green-100">
+                                    <h4 class="text-[10px] font-black text-green-600 uppercase tracking-widest mb-6">Happy Camper</h4>
+                                    <p class="text-2xl font-black text-green-700">Capped at $${pricing.hcExcess} total.</p>
+                                    <p class="text-xs font-bold text-green-600 mt-2">Everything included.</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="flex justify-end mt-8"><button onclick="setActiveSection('objections')" class="bg-slate-900 text-white px-10 py-5 rounded-2xl font-black text-sm tracking-widest flex items-center gap-3">HANDLE OBJECTIONS <i data-lucide="arrow-right"></i></button></div>
+                    </div>`;
+            } else if (state.activeSection === 'objections') {
+                const currentObj = OBJECTIONS.find(o => o.id === state.selectedObjection);
+                const scriptText = typeof currentObj.script === 'function' ? currentObj.script(pricing) : currentObj.script;
+
+                html = `
+                    <div class="fade-in">
+                        <div class="flex items-center justify-between mb-6">
+                            <h2 class="text-3xl font-black tracking-tighter uppercase">Objections Bank</h2>
+                        </div>
+
+                        <div class="flex flex-col lg:flex-row gap-6">
+                            <div class="w-full lg:w-72 flex flex-row lg:flex-col gap-2 overflow-x-auto lg:overflow-y-auto no-scrollbar pb-2 lg:pb-0 shrink-0">
+                                ${OBJECTIONS.map(obj => `
+                                    <button onclick="selectObjection('${obj.id}')" 
+                                        class="objection-card flex items-center gap-3 p-4 rounded-xl border-2 text-left transition-all shrink-0 lg:shrink min-w-[160px] lg:min-w-0 ${state.selectedObjection === obj.id ? 'active shadow-md' : 'bg-white border-slate-100 hover:border-slate-200'}">
+                                        <div class="p-2 rounded-lg ${state.selectedObjection === obj.id ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-400'}">
+                                            <i data-lucide="${obj.icon}" class="w-4 h-4"></i>
+                                        </div>
+                                        <span class="text-[10px] font-black uppercase tracking-tight ${state.selectedObjection === obj.id ? 'text-blue-900' : 'text-slate-500'}">${obj.label}</span>
+                                    </button>
+                                `).join('')}
+                            </div>
+
+                            <div class="flex-1 flex flex-col min-h-[400px]">
+                                <div class="bg-slate-900 text-white rounded-[32px] p-8 md:p-10 shadow-xl flex-1 flex flex-col relative overflow-hidden">
+                                    <div class="absolute -top-4 -right-4 p-8 opacity-[0.03]">
+                                        <i data-lucide="${currentObj.icon}" class="w-48 h-48"></i>
+                                    </div>
+                                    
+                                    <div class="relative z-10 flex flex-col h-full">
+                                        <div class="flex items-center gap-2 mb-6">
+                                            <span class="px-2 py-0.5 bg-blue-600 rounded-md text-[9px] font-black uppercase tracking-widest">Script</span>
+                                            <span class="text-slate-400 font-bold text-[9px] uppercase tracking-widest italic">${currentObj.label}</span>
+                                        </div>
+                                        
+                                        <div class="flex-1 overflow-y-auto no-scrollbar pr-2 mb-6">
+                                            <p class="text-xl md:text-2xl font-medium leading-relaxed italic text-pretty text-slate-100">
+                                                "${scriptText}"
+                                            </p>
+                                        </div>
+
+                                        <div class="pt-6 border-t border-slate-800 shrink-0">
+                                            <h4 class="text-[9px] font-black text-blue-400 uppercase tracking-widest mb-3">Bullet Point Summary:</h4>
+                                            <div class="flex flex-wrap gap-x-6 gap-y-2">
+                                                ${currentObj.points.map(p => `<div class="flex items-center gap-2 text-[11px] font-bold text-slate-400"><div class="w-1.5 h-1.5 rounded-full bg-blue-600 shrink-0"></div> ${p}</div>`).join('')}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="flex justify-end mt-8">
+                            <button onclick="setActiveSection('close')" class="bg-slate-900 text-white px-10 py-5 rounded-2xl font-black text-sm tracking-widest flex items-center gap-3 uppercase shadow-lg hover:bg-blue-700 transition-all">
+                                Go to Final Close <i data-lucide="shield-check"></i>
+                            </button>
+                        </div>
+                    </div>
+                `;
+            } else if (state.activeSection === 'close') {
+                let closeScript = state.closeType==='soft' ? "Would you like me to switch that over now so everything’s sorted before your trip?" : 
+                                 state.closeType==='standard' ? `Does upgrading to Happy Camper for $${ud.toFixed(0)} per day make sense for peace of mind?` :
+                                 "Given the difference in excess and excluded items, Happy Camper is the smarter option. Shall I make that change now?";
+                html = `<div class="fade-in"><h2 class="text-4xl font-black tracking-tighter uppercase mb-10">The Close</h2><div class="flex gap-2 mb-8 bg-slate-100 p-1 rounded-2xl w-fit"><button onclick="setCloseType('soft')" class="px-6 py-3 rounded-xl text-xs font-black uppercase ${state.closeType==='soft'?'bg-white shadow text-blue-600':'text-slate-400'}">Soft</button><button onclick="setCloseType('standard')" class="px-6 py-3 rounded-xl text-xs font-black uppercase ${state.closeType==='standard'?'bg-white shadow text-blue-600':'text-slate-400'}">Standard</button><button onclick="setCloseType('hard')" class="px-6 py-3 rounded-xl text-xs font-black uppercase ${state.closeType==='hard'?'bg-white shadow text-red-600':'text-slate-400'}">Hard</button></div><div class="bg-white border-2 border-slate-100 rounded-[40px] p-12 mb-8"><p class="text-3xl font-bold text-slate-800 italic text-pretty">"${closeScript}"</p></div><div class="flex justify-center gap-6"><button onclick="setActiveSection('pre_call')" class="p-6 bg-green-50 rounded-3xl border border-green-100 flex flex-col items-center gap-2 w-40 hover:scale-105 transition-all"><i data-lucide="thumbs-up" class="w-8 h-8 text-green-600"></i><span class="text-[10px] font-black uppercase">Confirmed</span></button><button onclick="setActiveSection('pre_call')" class="p-6 bg-red-50 rounded-3xl border border-red-100 flex flex-col items-center gap-2 w-40 hover:scale-105 transition-all"><i data-lucide="thumbs-down" class="w-8 h-8 text-red-600"></i><span class="text-[10px] font-black uppercase">Declined</span></button></div></div>`;
+            }
+            container.innerHTML = html;
+            lucide.createIcons();
+        }
+
+        function renderAll() { renderSidebar(); renderConfigModal(); renderNav(); renderContent(); }
+        renderAll();
+    </script>
+</body>
+</html>
